@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "teaforall",
+  "version": "${version}",
+  "name": "teaforall",
+  "description": "",
+  "authors": [],
+  "contact": {
+    "repo": "https://github.com/sunmingyang0115/teaforall"
+  },
+  "license": "All-Rights-Reserved",
+  "icon": "assets/teaforall/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "client": [
+      "io.github.sunmingyang0115.teaforall.client.TeaforallClient"
+    ],
+    "main": [
+      "io.github.sunmingyang0115.teaforall.Teaforall"
+    ]
+  },
+  "mixins": [
+    "teaforall.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}"
+  }
+
+
+
+}

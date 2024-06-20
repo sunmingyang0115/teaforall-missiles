@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.sunmingyang0115.teaforall.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "BulbBlockMixin",
+    "ObserverBlockMixin"
+  ],
+  "client": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
