@@ -12,7 +12,7 @@ public class TagDB {
      * Simple method to store data into entities by using tags
      * Warning: beware of multiple TagDB instances
      */
-    static final String prefix = "io.github.sunmingyang0115.teaforall";
+    static final String prefix = "io.github.sunmingyang0115.teaforall-missiles";
     HashMap<String, String> data;
     String oldTag;  // we keep track of this so that we replace it when we are done with altering the data
     Entity that;
