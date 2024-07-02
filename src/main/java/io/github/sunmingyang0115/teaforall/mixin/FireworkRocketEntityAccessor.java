@@ -18,4 +18,7 @@ public interface FireworkRocketEntityAccessor {
 
     @Invoker("getExplosions")
     public List<FireworkExplosionComponent> invokeGetExplosions();
+
+    @Accessor("lifeTime")
+    public int getLifeTime();
 }

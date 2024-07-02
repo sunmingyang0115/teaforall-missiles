@@ -1,190 +1,260 @@
 package io.github.sunmingyang0115.teaforall.mixin;
 
-import com.sun.jna.platform.win32.OaIdl;
-import net.minecraft.block.*;
+import io.github.sunmingyang0115.teaforall.missile.AutomaticGuidance;
+import io.github.sunmingyang0115.teaforall.missile.GuidedMissile;
+import io.github.sunmingyang0115.teaforall.missile.ManualGuidance;
+import io.github.sunmingyang0115.teaforall.util.TagDB;
+import io.github.sunmingyang0115.teaforall.util.Vec3dExtraUtil;
 import net.minecraft.component.type.FireworkExplosionComponent;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ItemEntity;
+import net.minecraft.component.type.SuspiciousStewEffectsComponent;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.ai.TargetPredicate;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.mob.ZombieEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.entity.projectile.FireworkRocketEntity;
+import net.minecraft.entity.projectile.ProjectileUtil;
+import net.minecraft.entity.projectile.WindChargeEntity;
+import net.minecraft.particle.ParticleEffect;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.predicate.entity.EntityPredicates;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.random.Random;
 import net.minecraft.world.RaycastContext;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.StructureSpawns;
+import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
+
+import static io.github.sunmingyang0115.teaforall.util.DBFlags.*;
+
 
 @Mixin(FireworkRocketEntity.class)
 public class FireworkRocketEntityMixin {
+    @Unique
+    private static final double MAX_TURN = (5)*Math.PI/180;
 
 
     @Unique
-    void spawnParticle(ServerPlayerEntity spe, Vec3d pos) {
-        spe.getServerWorld().spawnParticles(spe, ParticleTypes.CLOUD, true, pos.getX(), pos.getY(), pos.getZ(), 1, 0, 0, 0, 0.1);
+    public LivingEntity pemAttemptTrack(PlayerEntity that, double size, double radius) {
+        LivingEntity e = null;
+        Vec3d dir = that.getRotationVector();
+        Vec3d pos1 = that.getEyePos();
+        for (LivingEntity le : that.getWorld().getEntitiesByClass(LivingEntity.class, that.getBoundingBox().expand(size), EntityPredicates.VALID_LIVING_ENTITY)) {
+            if (le.equals(that)) continue;
+            for (Vec3d pos2 : new Vec3d[]{le.getPos(), le.getEyePos()}) {
+                double na = Math.acos( pos2.subtract(pos1).normalize().dotProduct(dir) );
+                if (radius == -1 || radius > na) {
+                    BlockHitResult br = that.getWorld().raycast(new RaycastContext(pos1, pos2, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, that));
+                    if (((HitResult)br).getType() == HitResult.Type.MISS) {
+                        e = le;
+                        radius = na;
+                    }
+                }
+            }
+        }
+        return e;
     }
-
 
     @Unique
-    @Nullable LivingEntity getClosestLivingEntity(Vec3d pos, List<LivingEntity> entity_list, double d) {
-        LivingEntity target = null;
-        for (LivingEntity le : entity_list) {
-            double nd = le.squaredDistanceTo(pos);
-            if (nd < d) {
-                d = nd;
-                target = le;
-            }
-            else System.out.println(nd);
+    public double predictSplashTime(Vec3d pos1, double vel1, Vec3d pos2, Vec3d vel2) {
+        double t = 0; // initial guess
+        Vec3d pred = null;
+        double[] ts = new double[10];
+        for (int i = 0; i < 10; i++) {
+            pred = pos2.add(vel2.multiply(t));
+            t = pred.subtract(pos1).length()/vel1;
+//            ts[i] = t;
         }
-        return target;
+//        System.out.println(Arrays.toString(ts));
+        return t;
+    }
+
+    @Unique
+    public Vec3d predictPNSplashTime(Vec3d pos1, double vel1, Vec3d pos2, Vec3d vel2) {
+        // use pi/4 as PN angle
+        Vec3d dpos = pos2.subtract(pos1);
+        Vec3d _vel1 = Vec3dExtraUtil.rotateInDirection(vel2, dpos, Math.PI/4.0).normalize().multiply(vel1);
+//        double t = Vec3dExtraUtil.perp(_vel1, vel2).length() / dpos.length();
+//        System.out.println(t);
+//        return t;
+        return _vel1;
     }
 
 
-    @Redirect(method = "explodeAndRemove", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/projectile/FireworkRocketEntity;explode()V"))
-        public void explode(FireworkRocketEntity that) {
-        /**
-         * normal => 'normal explosion'
-         * feather => 'armor piercing' : 1/2 damage + armor damage + block piercing
-         * fire charge => 'high explosive' : huge radius
-         * mob skull => 'huge damage' : huge damage?
-         */
-        List<FireworkExplosionComponent> list_fec = ((FireworkRocketEntityAccessor) that).invokeGetExplosions();
-//        System.out.println(list_fec.size());
-        if (list_fec.isEmpty()) return;
-        FireworkExplosionComponent fec = list_fec.get(that.getRandom().nextBetween(0, list_fec.size()-1));
-        int size_bonus_damage = list_fec.size();
-        float base_damage = 5.0f + 2.0f * size_bonus_damage;
-
-        List<LivingEntity> nearby_living_entities = that.getWorld().getNonSpectatingEntities(LivingEntity.class, that.getBoundingBox().expand(5.0));
-
-        if (fec.shape() == FireworkExplosionComponent.Type.BURST) {
-            for (LivingEntity le : nearby_living_entities) {
-                float dist = that.distanceTo(le);
-                if (dist >= 5) continue;
-                float d = (float) (base_damage*Math.sqrt((5 - dist)/5));
-                DamageSource ds = that.getDamageSources().fireworks(that, that.getOwner());
-                le.damage(ds, d/2);
-                ((LivingEntityAccessor) le).invokeDamageArmor(ds, d/2);
-            }
-        } else {
-            if (that.getOwner() instanceof PlayerEntity p) {
-                p.sendMessage(Text.of("<other_explosion!>"), true);
-            }
-        }
-
-
-
-//        else if (fec.shape() == FireworkExplosionComponent.Type.LARGE_BALL) {
-//            float f = 5.0f + size_bonus_damage;
-//
-//        }
-
-
-        // ====
-
-//        float f = 5.0f + (float)(list.size() * 2);
-//
-//        // choose a random effect from the list of fireworks to be applied
-////        FireworkExplosionComponent fec = list.get(that.getRandom().nextBetween(0, list.size()-1));
-//
-//        if (f > 0.0f) {
-//            double d = 5.0;
-//            Vec3d vec3d = that.getPos();
-//            List<LivingEntity> list2 = that.getWorld().getNonSpectatingEntities(LivingEntity.class, that.getBoundingBox().expand(5.0));
-//            for (LivingEntity livingEntity : list2) {
-//                boolean bl = false;
-//                for (int i = 0; i < d; ++i) {
-//                    Vec3d vec3d2 = new Vec3d(livingEntity.getX(), livingEntity.getBodyY(0.5 * (double)i), livingEntity.getZ());
-//                    BlockHitResult hitResult = that.getWorld().raycast(new RaycastContext(vec3d, vec3d2, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, that));
-//                    if (((HitResult)hitResult).getType() != HitResult.Type.MISS) continue;
-//                    bl = true;
-//                    break;
-//                }
-//                if (!bl) continue;
-//                float g = f * (float)Math.sqrt((5.0 - (double)that.distanceTo(livingEntity)) / 5.0);
-//                livingEntity.damage(that.getDamageSources().fireworks(that, that.getOwner()), g);
-//            }
-//        }
-//        ci.cancel();
-    }
 
     @Inject(method = "tick", at = @At("HEAD"))
     public void tick(CallbackInfo ci) {
+
+
         FireworkRocketEntity that = (FireworkRocketEntity) (Object) this;
+        FireworkRocketEntityAccessor acc = ((FireworkRocketEntityAccessor) that);
+        TagDB db = new TagDB(that);
 
         // manually guided missile
         if (that == null || that.getOwner() == null || !that.wasShotAtAngle()) return;
-//        ((FireworkRocketEntityAccessor) that).setLifetime(20);
+
+        // reduce lag
         if (that.distanceTo(that.getOwner()) > 8*16) {
-            ((FireworkRocketEntityAccessor) that).invokeExplodeAndRemove();
+            acc.invokeExplodeAndRemove();
         }
 
-        // make all fireworks experience inaccuracy
+        List<FireworkExplosionComponent> list_fec = ((FireworkRocketEntityAccessor) that).invokeGetExplosions();
+        FireworkExplosionComponent fec = list_fec.size()==0?null:list_fec.get(0);
+
+
+
+        // make guided missiles last longer
+        if (fec != null && that.age == 0) {
+            if (fec.hasTrail() || fec.hasTwinkle()) {
+                acc.setLifetime(acc.getLifeTime() * 4);
+            }
+        }
+
+        // tracking
+        if (fec != null && that.age < 5) {
+            if (!db.contains(TRACKING_ID) && fec.hasTrail() && that.getOwner() instanceof PlayerEntity p) {
+                TagDB pdb = new TagDB(p);
+                if (pdb.contains(TRACKING_TIME) && pdb.getInt(TRACKING_TIME) == 0) {
+                    db.putInt(TRACKING_ID, pdb.getInt(TRACKING_ID));
+                }
+            }
+        }
+
+
+        if (db.contains(FUSE)) {
+            int f = db.getInt(FUSE);
+            if (f == 0) {
+                Vec3d p = db.getVec3d(DETONATION_POS);
+                that.setPos(p.x, p.y, p.z);
+                ((FireworkRocketEntityAccessor) that).invokeExplodeAndRemove();
+            }
+            db.putInt(FUSE, f-1);
+        }
+
+        Vec3d nvel;
+
+        if (fec != null && that.getOwner() instanceof PlayerEntity p && db.contains(TRACKING_ID)) {
+            LivingEntity tracker = (LivingEntity) that.getWorld().getEntityById(db.getInt(TRACKING_ID));
+            if (tracker != null) {
+                GuidedMissile gm = new AutomaticGuidance(that.getBoundingBox().getCenter(), that.getVelocity(), tracker.getBoundingBox().getCenter(), tracker.getVelocity());
+
+                nvel = gm.getGeeLimitedLeadingDir().multiply(2);
+                int t = gm.getFuse();
+                if (t != -1 && !db.contains(FUSE)) {
+                    db.putInt(FUSE, t);
+                    db.putVec3d(DETONATION_POS, gm.getImpactPosition());
+                }
+
+                if (that.age == 10 && tracker instanceof PlayerEntity p2) {
+                    p2.playSoundToPlayer(SoundEvents.ENTITY_ELDER_GUARDIAN_CURSE, SoundCategory.PLAYERS, 1, 1);
+                }
+
+            } else {
+                nvel = randomizeVel(that, 0.05);
+            }
+        }
+        else if (fec != null && that.getOwner() instanceof PlayerEntity p && (fec.hasTwinkle() || fec.hasTrail())) {
+            Vec3d eye = p.getRotationVector();
+            Vec3d ndir_raw = that.getVelocity().normalize().multiply(0.8).add(eye.normalize().multiply(0.2));
+            nvel = ndir_raw.multiply(2);
+        }
+        else {
+            nvel = randomizeVel(that, 0.05);
+        }
+//        nvel = randomizeVel(that, 0.05);
+
+
+
+//        // particles
+//        for (PlayerEntity p : that.getWorld().getPlayers()) {
+//            if (p.distanceTo(that) > 100) return;
+//            ServerPlayerEntity spe = (ServerPlayerEntity) p;
+//
+//            if (that.age%2==0) {
+//                spe.getServerWorld().spawnParticles(spe, ParticleTypes.GUST, true, that.getPos().getX(), that.getPos().getY(), that.getPos().getZ(), 1,0, 0, 0, 0.01);
+//            }
+//        }
+
+        if (Vec3dExtraUtil.getAngle(that.getVelocity(), nvel) > MAX_TURN) {
+
+            that.setVelocity(Vec3dExtraUtil.rotateInDirection(that.getVelocity(), nvel, MAX_TURN));
+
+        }else {
+//            spe.getServerWorld().spawnParticles(spe, ParticleTypes.HEART, true, that.getPos().getX(), that.getPos().getY(), that.getPos().getZ(), 1, 0, 0, 0, 0.01);
+            that.setVelocity(nvel);
+        }
+//        that.setVelocity(randomizeVel(that, 0.05));
+
+
+
+
+
+        db.write();
+
+
+//        ProjectileUtil.setRotationFromVelocity(that, 0.2f);
+
+//        // prox
+//        boolean flag = false;
+//        if (that.age > 10) {
+//            for (LivingEntity le : that.getWorld().getEntitiesByClass(LivingEntity.class, that.getBoundingBox().expand(5), EntityPredicates.VALID_LIVING_ENTITY)) {
+//                for (int i = 0; i < 8; i++) {
+//                    Vec3d pos2 = Vec3dExtraUtil.lerp(le.getPos(), le.getPos().add(le.getVelocity()), i/8.0);
+//                    for (int j = 0; j < 8; j++) {
+//                        Vec3d pos1 = Vec3dExtraUtil.lerp(that.getPos(), that.getPos().add(that.getVelocity()), i/8.0);
+//                        if (pos2.subtract(pos1).length() <= 2) {
+//                            flag = true;
+////                            le.sendMessage(Text.of("dog"));
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//
+//        if (flag) ((FireworkRocketEntityAccessor) that).invokeExplodeAndRemove();
+
+
+//        that.setVelocity(Vec3dExtraUtil.getAngle(that.getVelocity(), nvel) > MAX_TURN?Vec3dExtraUtil.rotateInDirection(that.getVelocity(), nvel, MAX_TURN):nvel);
+
+
+//        TagDB db = new TagDB(that);
+//        if (!db.contains(G_TOLERANCE)) {
+//            db.putDouble(G_TOLERANCE, 3);
+//        }
+//        double db_angle = db.getDouble(G_TOLERANCE);
+//        double angle = Math.acos(nvel.normalize().dotProduct(that.getVelocity().normalize()));
+//        if (angle < db_angle) {
+//            that.setVelocity(nvel);
+//            db_angle -= angle;
+//        }db_angle += 0.05;
+//        db.putDouble(G_TOLERANCE, db_angle);
+//        db.write();
+
+    }
+
+    @Unique
+    private Vec3d randomizeVel(FireworkRocketEntity that, double alpha) {
         if (that.age%4 == 0) {
             that.age += 2*(that.getRandom().nextGaussian()+1);  // 0 - 2
             Vec3d ndir_raw = that.getVelocity().normalize();
             Vec3d ran = new Vec3d(that.getRandom().nextGaussian(), that.getRandom().nextGaussian()-0.8, that.getRandom().nextGaussian());
-            Vec3d ndir = ndir_raw.add(ran.multiply(0.05)).normalize();
-            that.setVelocity(ndir.multiply(that.getVelocity().length()));
+            Vec3d ndir = ndir_raw.add(ran.multiply(alpha)).normalize();
+            return ndir.multiply(that.getVelocity().length());
         }
-
-//        that.getExplosions().get(0).
-
-//        if (that.getOwner() instanceof PlayerEntity p) {
-//            // relative tracking
-//            if (p.isSneaking()) {
-//                p.sendMessage(Text.of("Tracking..." + that.getPos().toString()), true);
-//                Vec3d eye = that.getOwner().getRotationVector();
-//                Vec3d ndir_raw = that.getVelocity().normalize().multiply(0.8).add(eye.normalize().multiply(0.2));
-//                that.setVelocity(ndir_raw.multiply(1.6));
-//            } else {
-//                Vec3d ndir_raw = that.getVelocity().normalize();
-//                Vec3d ran = new Vec3d(that.getRandom().nextGaussian(), that.getRandom().nextGaussian()-0.8, that.getRandom().nextGaussian());
-//                Vec3d ndir = ndir_raw.add(ran.multiply(0.05)).normalize();
-//                that.setVelocity(ndir.multiply(that.getVelocity().length()));
-////                ((FireworkRocketEntityAccessor) that).invokeExplodeAndRemove();
-//            }
-//
-//
-//        }
-
-
-        // artillery
-//        Vec3d ndir_raw = that.getVelocity().normalize();
-//        Vec3d ran = new Vec3d(that.getRandom().nextGaussian(), that.getRandom().nextGaussian()-0.8, that.getRandom().nextGaussian());
-//        Vec3d ndir = ndir_raw.add(ran.multiply(0.02)).normalize();
-//        that.setVelocity(ndir.multiply(that.getVelocity().length()));
-
-
-    }
-
-    @Unique
-    private boolean livingEntityInRange(FireworkRocketEntity that, int d) {
-        for (LivingEntity le : that.getWorld().getNonSpectatingEntities(LivingEntity.class, that.getBoundingBox().expand(5.0))) {
-            if (le != that.getOwner() && that.distanceTo(le) <= d) return true;
-        }
-        return false;
+        return that.getVelocity();
     }
 
 }
