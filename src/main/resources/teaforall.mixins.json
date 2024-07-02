@@ -7,8 +7,7 @@
     "FireworkRocketEntityAccessor",
     "FireworkRocketEntityMixin",
     "LivingEntityAccessor",
-    "PlayerEntityMixin",
-    "ProjectileUtilMixin"
+    "PlayerEntityMixin"
   ],
   "client": [
   ],

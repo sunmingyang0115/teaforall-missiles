@@ -3,6 +3,7 @@ package io.github.sunmingyang0115.teaforall.mixin;
 import io.github.sunmingyang0115.teaforall.missile.AutomaticGuidance;
 import io.github.sunmingyang0115.teaforall.missile.GuidedMissile;
 import io.github.sunmingyang0115.teaforall.missile.ManualGuidance;
+import io.github.sunmingyang0115.teaforall.missile.NoGuidance;
 import io.github.sunmingyang0115.teaforall.util.TagDB;
 import io.github.sunmingyang0115.teaforall.util.Vec3dExtraUtil;
 import net.minecraft.component.type.FireworkExplosionComponent;
@@ -51,7 +52,6 @@ public class FireworkRocketEntityMixin {
         FireworkRocketEntityAccessor acc = ((FireworkRocketEntityAccessor) that);
         TagDB db = new TagDB(that);
 
-        // manually guided missile
         if (that == null || that.getOwner() == null || !that.wasShotAtAngle()) return;
 
         // reduce lag
@@ -97,44 +97,26 @@ public class FireworkRocketEntityMixin {
             LivingEntity tracker = (LivingEntity) that.getWorld().getEntityById(db.getInt(TRACKING_ID));
             if (tracker != null) {
                 GuidedMissile gm = new AutomaticGuidance(that.getBoundingBox().getCenter(), that.getVelocity(), tracker.getBoundingBox().getCenter(), tracker.getVelocity());
-
-                nvel = gm.getGeeLimitedLeadingDir().multiply(2);
+                nvel = gm.getGeeLimitedLeadingDir();
                 int t = gm.getFuse();
                 if (t != -1 && !db.contains(FUSE)) {
                     db.putInt(FUSE, t);
                     db.putVec3d(DETONATION_POS, gm.getImpactPosition());
                 }
-
-                if (that.age == 10 && tracker instanceof PlayerEntity p2) {
-                    p2.playSoundToPlayer(SoundEvents.ENTITY_ELDER_GUARDIAN_CURSE, SoundCategory.PLAYERS, 1, 1);
-                }
-
             } else {
-                nvel = randomizeVel(that, 0.05);
+                nvel = new NoGuidance(that.getBoundingBox().getCenter(), that.getVelocity(), that.getRandom(), that.age, 0.05f).getGeeLimitedLeadingDir();
             }
         } else if (fec != null && that.getOwner() instanceof PlayerEntity p && (fec.hasTwinkle() || fec.hasTrail())) {
-            Vec3d eye = p.getRotationVector();
-            Vec3d ndir_raw = that.getVelocity().normalize().multiply(0.8).add(eye.normalize().multiply(0.2));
-            nvel = ndir_raw.multiply(2);
+            nvel = new ManualGuidance(that.getBoundingBox().getCenter(), that.getVelocity(), p.getRotationVector()).getGeeLimitedLeadingDir();
         } else {
-            nvel = randomizeVel(that, 0.05);
+            nvel = new NoGuidance(that.getBoundingBox().getCenter(), that.getVelocity(), that.getRandom(), that.age, 0.05f).getGeeLimitedLeadingDir();
         }
-        that.setVelocity(nvel);
+        that.setVelocity(nvel.multiply(2));
         db.write();
     }
 
 
-    @Unique
-    private Vec3d randomizeVel(FireworkRocketEntity that, double alpha) {
-        if (that.age%4 == 0) {
-            that.age += 2*(that.getRandom().nextGaussian()+1);  // 0 - 2
-            Vec3d ndir_raw = that.getVelocity().normalize();
-            Vec3d ran = new Vec3d(that.getRandom().nextGaussian(), that.getRandom().nextGaussian()-0.8, that.getRandom().nextGaussian());
-            Vec3d ndir = ndir_raw.add(ran.multiply(alpha)).normalize();
-            return ndir.multiply(that.getVelocity().length());
-        }
-        return that.getVelocity();
-    }
+
 
 }
 
