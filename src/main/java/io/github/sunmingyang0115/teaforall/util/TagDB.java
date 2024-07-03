@@ -53,11 +53,24 @@ public class TagDB {
         this.putDouble(key+"-Vec3d-y", value.getY());
         this.putDouble(key+"-Vec3d-z", value.getZ());
     }
-//    public <T> void putList(String key, List<T> value) {
-//        for (T e : a) {
-//            String.valueOf(a.get(0))
-//        }
-//    }
+
+    public void remove(String key) {
+        data.remove(key);
+    }
+    public void removeInt(String key) {
+        this.remove(key);
+    }
+    public void removeFloat(String key) {
+        this.remove(key);
+    }
+    public void removeDouble(String key) {
+        this.remove(key);
+    }
+    public void removeVec3d(String key, Vec3d value) {
+        this.removeDouble(key+"-Vec3d-x");
+        this.removeDouble(key+"-Vec3d-y");
+        this.removeDouble(key+"-Vec3d-z");
+    }
 
     /**
      * Gets stored value from key

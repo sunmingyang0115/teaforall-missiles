@@ -81,6 +81,7 @@ public class FireworkRocketEntityMixin {
         }
 
 
+
         if (db.contains(FUSE)) {
             int f = db.getInt(FUSE);
             if (f == 0) {
@@ -103,6 +104,17 @@ public class FireworkRocketEntityMixin {
                     db.putInt(FUSE, t);
                     db.putVec3d(DETONATION_POS, gm.getImpactPosition());
                 }
+
+                // rwr
+                double d = that.getPos().distanceTo(tracker.getPos());
+                if (tracker instanceof PlayerEntity tracker_p) {
+                    TagDB tdb = new TagDB(tracker_p);
+                    if (!tdb.contains(CLOSEST_MISSILE) || tdb.getDouble(CLOSEST_MISSILE) > d) {
+                        tdb.putDouble(CLOSEST_MISSILE, d);
+                    }
+                    tdb.write();
+                }
+
             } else {
                 nvel = new NoGuidance(that.getBoundingBox().getCenter(), that.getVelocity(), that.getRandom(), that.age, 0.05f).getGeeLimitedLeadingDir();
             }
@@ -112,6 +124,7 @@ public class FireworkRocketEntityMixin {
             nvel = new NoGuidance(that.getBoundingBox().getCenter(), that.getVelocity(), that.getRandom(), that.age, 0.05f).getGeeLimitedLeadingDir();
         }
         that.setVelocity(nvel.multiply(2));
+//        System.out.println("bruh " + nvel.multiply(2));
         db.write();
     }
 

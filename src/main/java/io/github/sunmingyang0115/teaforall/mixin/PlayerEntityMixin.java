@@ -10,10 +10,14 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.CrossbowItem;
 import net.minecraft.item.FireworkRocketItem;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.packet.s2c.play.PlaySoundS2CPacket;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.predicate.entity.EntityPredicates;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.server.command.PlaySoundCommand;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.hit.BlockHitResult;
@@ -32,8 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.PriorityQueue;
 
-import static io.github.sunmingyang0115.teaforall.util.DBFlags.TRACKING_ID;
-import static io.github.sunmingyang0115.teaforall.util.DBFlags.TRACKING_TIME;
+import static io.github.sunmingyang0115.teaforall.util.DBFlags.*;
 
 @Mixin(PlayerEntity.class)
 public class PlayerEntityMixin {
@@ -102,26 +105,36 @@ public class PlayerEntityMixin {
         return e;
     }
 
+
+    @Unique
+    void playSignal(SoundEvent sound, PlayerEntity p, float vol, float pitch) {
+        ServerPlayerEntity spe = (ServerPlayerEntity) p;
+        spe.networkHandler.sendPacket(new PlaySoundS2CPacket(RegistryEntry.of(sound), SoundCategory.PLAYERS, spe.getX(), spe.getY(), spe.getZ(), vol, pitch, spe.getRandom().nextLong()));
+    }
+
     @Unique
     void playTrackInterruption(PlayerEntity p) {
-        p.playSoundToPlayer(SoundEvents.BLOCK_NOTE_BLOCK_HAT.value(), SoundCategory.PLAYERS, 1, 0.3f);
+        playSignal(SoundEvents.BLOCK_NOTE_BLOCK_HAT.value(), p, 1, 0.3f);
         p.sendMessage(Text.of("Lock Interrupted"), true);
     }
     @Unique
     void playTrackProgress(PlayerEntity p) {
         if (p.getWorld().getTime() % 3 == 0) {
-            p.playSoundToPlayer(SoundEvents.BLOCK_NOTE_BLOCK_HAT.value(), SoundCategory.PLAYERS, 1, 2f);
+            playSignal(SoundEvents.BLOCK_NOTE_BLOCK_HAT.value(), p, 1, 2f);
             p.sendMessage(Text.of("Tracking..."), true);
         }
     }
     @Unique
     void playTrackingLock(PlayerEntity p) {
-//        if (p.getWorld().getTime() % 15 == 0) {
-        p.playSoundToPlayer(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), SoundCategory.PLAYERS, 0.33f, 1.95f);
-        p.playSoundToPlayer(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), SoundCategory.PLAYERS, 0.33f, 2f);
-        p.playSoundToPlayer(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), SoundCategory.PLAYERS, 0.33f, 1.6f);
+        playSignal(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), p, 0.33f, 1.95f);
+        playSignal(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), p,  0.33f, 2f);
+        playSignal(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), p, 0.33f, 1.6f);
         p.sendMessage(Text.of("Target Locked"), true);
-//        }
+    }
+
+    @Unique
+    void playRWR(PlayerEntity p, double d) {
+        playSignal(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), p, 0.33f, 1f);
     }
 
 
@@ -143,6 +156,12 @@ public class PlayerEntityMixin {
         ServerPlayerEntity spe = (ServerPlayerEntity) that;
         TagDB db = new TagDB(that);
 
+        // rwr
+        if (db.contains(CLOSEST_MISSILE) && that.age % 4 == 0) {
+            playRWR(that, db.getDouble(CLOSEST_MISSILE));
+            db.removeDouble(CLOSEST_MISSILE);
+        }
+
         if (!db.contains(TRACKING_TIME) || !db.contains(TRACKING_ID)) {
             db.putInt(TRACKING_TIME, TIME_NEEDED_FOR_TRACK);
             db.putInt(TRACKING_ID, 0);
@@ -151,7 +170,7 @@ public class PlayerEntityMixin {
         int time = db.getInt(TRACKING_TIME);
         int id = db.getInt(TRACKING_ID);
 
-        if (!holdingTrackItem(that)) {
+        if (!holdingTrackItem(that) && !that.isSneaking()) {
             // reset if switched off
             db.putInt(TRACKING_TIME, TIME_NEEDED_FOR_TRACK);
             db.write();

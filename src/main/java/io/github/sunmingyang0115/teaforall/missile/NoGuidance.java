@@ -16,11 +16,11 @@ public class NoGuidance extends GuidedMissile {
 
     @Override
     protected Vec3d calculateLeadingDir() {
-        if (age % 4 != 0) return getProjVel();
+        if (age % 4 != 0) return getProjVel().normalize();
         Vec3d ndir_raw = getProjVel().normalize();
         Vec3d ran = new Vec3d(this.ran.nextGaussian(), this.ran.nextGaussian()-0.8, this.ran.nextGaussian());
         Vec3d ndir = ndir_raw.add(ran.multiply(alpha)).normalize();
-        return ndir.multiply(getProjVel().length());
+        return ndir;
     }
 
     @Override

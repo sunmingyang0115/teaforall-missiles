@@ -15,9 +15,13 @@ public abstract class GuidedMissile {
 
     public Vec3d getGeeLimitedLeadingDir() {
         Vec3d nvel = this.calculateLeadingDir();
-        if (Vec3dExtraUtil.getAngle(projVel, nvel) > MAX_TURN_ANGLE)
-            return Vec3dExtraUtil.rotateInDirection(projVel.normalize(), nvel, MAX_TURN_ANGLE);
-        return this.calculateLeadingDir();
+        if (Vec3dExtraUtil.getAngle(projVel, nvel) > MAX_TURN_ANGLE) {
+            Vec3d tmp = Vec3dExtraUtil.rotateInDirection(projVel.normalize(), nvel, MAX_TURN_ANGLE);
+            System.out.println(tmp);
+            return tmp;
+        }
+
+        return nvel;
     }
 
     /**
