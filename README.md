@@ -44,7 +44,12 @@ Any player that wears a turtle helmet will recieve RWR, which is an alarm system
 
 The RWR sounds can only be heard by the wearer.
 
-RWR warns the player based on 3 tiers, with the higher tier taking priority over lower tiers. 
+RWR warns the player depending on which warning tier the RWR currently detects, with the higher tiers taking priority over lower tiers:
+
+### Tier 0
+No threat detected.
+
+No noise.
 
 ### Tier 1
 Activates when a nearby player is holding a crossbow loaded with an automatic guided missile. 
