@@ -1,5 +1,5 @@
 # Teaforall Missiles
-An easy solution for these elytra-pests that infects your world.
+An easy solution for these elytra-pests that infects your world. (Minecraft 1.21 only)
 
 'Teaforall Missiles' is server-side fabric mod for Minecraft that modifies the behaviour of crossbow-shot firework rockets into manual-guided and self-guided missiles that seeks out your enemies.
 
