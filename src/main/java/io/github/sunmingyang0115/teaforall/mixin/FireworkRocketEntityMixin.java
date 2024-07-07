@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static io.github.sunmingyang0115.teaforall.missile.RWR.invokeRWR;
 import static io.github.sunmingyang0115.teaforall.util.DBFlags.*;
 
 
@@ -80,8 +81,6 @@ public class FireworkRocketEntityMixin {
             }
         }
 
-
-
         if (db.contains(FUSE)) {
             int f = db.getInt(FUSE);
             if (f == 0) {
@@ -107,12 +106,8 @@ public class FireworkRocketEntityMixin {
 
                 // rwr
                 double d = that.getPos().distanceTo(tracker.getPos());
-                if (tracker instanceof PlayerEntity tracker_p) {
-                    TagDB tdb = new TagDB(tracker_p);
-                    if (!tdb.contains(CLOSEST_MISSILE) || tdb.getDouble(CLOSEST_MISSILE) > d) {
-                        tdb.putDouble(CLOSEST_MISSILE, d);
-                    }
-                    tdb.write();
+                if (tracker instanceof PlayerEntity) {
+                    invokeRWR(tracker, 2);
                 }
 
             } else {

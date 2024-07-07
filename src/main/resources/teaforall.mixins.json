@@ -7,6 +7,7 @@
     "FireworkRocketEntityAccessor",
     "FireworkRocketEntityMixin",
     "LivingEntityAccessor",
+    "OnAStickItemMixin",
     "PlayerEntityMixin"
   ],
   "client": [

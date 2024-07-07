@@ -1,11 +1,13 @@
 package io.github.sunmingyang0115.teaforall.util;
 
+import io.github.sunmingyang0115.teaforall.mixin.PlayerEntityMixin;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public class TagDB {
     /**
@@ -13,13 +15,17 @@ public class TagDB {
      * Warning: beware of multiple TagDB instances
      */
     static final String prefix = "io.github.sunmingyang0115.teaforall-missiles";
+    static final String pair_separator = "=";
+    static final String key_separator =  ",";
+
     HashMap<String, String> data;
-    String oldTag;  // we keep track of this so that we replace it when we are done with altering the data
+    String oldTag;
     Entity that;
     public TagDB(Entity _that) {
         data = new HashMap<>();
         that = _that;
         unpackTag(that.getCommandTags());
+//        data = new HashMap<>();
     }
 
     /**
@@ -97,21 +103,21 @@ public class TagDB {
      * removes old command tag and replaces with new one
      */
     public void write() {
-        that.removeCommandTag(oldTag);
+        that.removeCommandTag(getRawString(that.getCommandTags()));
         that.addCommandTag(tagFormat());
     }
 
     private String tagFormat() {
         StringBuilder tag = new StringBuilder(prefix);
         for (String s : data.keySet()) {
-            tag.append(s).append("=").append(data.get(s)).append(",");
+            tag.append(s).append(pair_separator).append(data.get(s)).append(key_separator);
         }
         return tag.toString();
     }
     private void unpackTag(Set<String> commandTags) {
         String dataAsString = fetchData(commandTags);
-        for (String s : dataAsString.split(",")) {
-            String[] parts = s.split("=");
+        for (String s : dataAsString.split(key_separator)) {
+            String[] parts = s.split(pair_separator);
             if (parts.length != 2) continue;
             data.put(parts[0],parts[1]);
         }
@@ -119,11 +125,13 @@ public class TagDB {
     private String fetchData(Set<String> commandTags) {
         if (commandTags == null)
             return "";
+        return getRawString(commandTags).replace(prefix, "");
+    }
 
+    private String getRawString(Set<String> commandTags) {
         for (String s : commandTags) {
             if (s.startsWith(prefix)) {
-                oldTag = s;
-                return s.replace(prefix, "");
+                return s;
             }
         }
         return "";

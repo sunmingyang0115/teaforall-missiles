@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "teaforall",
+  "id": "teaforall-missiles",
   "version": "${version}",
-  "name": "teaforall",
+  "name": "teaforall-missiles",
   "description": "",
   "authors": [],
   "contact": {
