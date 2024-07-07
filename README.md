@@ -1,5 +1,5 @@
 # Teaforall Missiles
-An easy solution for these elytra-pests that infects your world.
+An easy solution for these elytra-pests that infects your world. (Minecraft 1.21 only)
 
 'Teaforall Missiles' is server-side fabric mod for Minecraft that modifies the behaviour of crossbow-shot firework rockets into manual-guided and self-guided missiles that seeks out your enemies.
 
@@ -31,7 +31,7 @@ The max turning rate of these fireworks is roughly `100` degrees per second. (wi
 ### Automatic Guidance
 "Tracking Mode" will occur when a player holds a crossbow loaded with a `Trail` effect firework.
 
-During this mode, this player can looking at any LivingEntity for `1` second to track it. 
+During this mode, this player can looking at any LivingEntity for `10` ticks to track it. 
 
 If the player looks away or looks at a closer entity to their crosshair, then this lock is broken.
 
@@ -39,3 +39,29 @@ When a target successfully tracked, the firework will automatically seekout targ
 
 If shot without a lock, the firework will become unguided.  
 
+## RWR
+Any player that wears a turtle helmet will recieve RWR, which is an alarm system that warns the player about automatic guided missiles.
+
+The RWR sounds can only be heard by the wearer.
+
+RWR warns the player depending on which warning tier the RWR currently detects, with the higher tiers taking priority over lower tiers:
+
+### Tier 0
+No threat detected.
+
+No noise.
+
+### Tier 1
+Activates when a nearby player is holding a crossbow loaded with an automatic guided missile. 
+
+Sounds a periodic high pitched noise.
+
+### Tier 2
+Activiates when a player enters Tracking Mode on the RWR wearer.
+
+Sounds a rapid low pitched noise.
+
+### Tier 3
+Activiates when the automatic guided missile is fired at the RWR wearer.
+
+Sounds a rapid high pitched noise.
